@@ -55,7 +55,7 @@ function cokurtosis(data)
 
 				    end
 
-				    σiσjσkσl = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k])) * var(data[:, l])
+				    σiσjσkσl = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k]) * var(data[:, l]))
 
 				    M4[i,j,k, l] = M4[i,j,k] / (L*σiσjσkσl)
 				    
@@ -71,11 +71,11 @@ function cokurtosis(data)
     
 end
 
-function coskewness_portfolio(data, weights)
+function skewness_portfolio(portfolio, weights)
     
-    N = size(data)[2]
+    N = length(portfolio.assets)
     
-    M3 = reshape(coskewness(data), (N, N^2))
+    M3 = reshape(portfolio.CSK, (N, N^2))
     
     coskew_p = transpose(weights) * M3 * kron(weights, weights)
     
@@ -83,11 +83,11 @@ function coskewness_portfolio(data, weights)
     
 end
 
-function cokurtosis_portfolio(data, weights)
+function kurtosis_portfolio(portfolio, weights)
     
-    N = size(data)[2]
+    N = length(portfolio.assets)
     
-    M4 = reshape(cokurtosis(data), (N, N^3))
+    M4 = reshape(portfolio.CK, (N, N^3))
     
     cokurt_p = transpose(weights) * M4 * kron(weights, weights, weights)
     
