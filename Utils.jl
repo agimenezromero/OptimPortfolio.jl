@@ -7,6 +7,8 @@ function coskewness(data)
     L = size(data)[1]
 
     M3 = zeros((N, N, N))
+    
+    cntr = data .- mean(data, dims=1)
 
     @inbounds @simd for i in 1 : N
 
@@ -16,13 +18,13 @@ function coskewness(data)
 
                 for t in 1 : L
 
-                    M3[i,j,k] += (data[t,i] - mean(data[:,i])) * (data[t,j] - mean(data[:,j])) * (data[t,k] - mean(data[:,k]))
+                    M3[i,j,k] += cntr[t,i] * cntr[t,j] * cntr[t,k]
 
                 end
 
                 σiσjσk = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k]))
 
-                M3[i,j,k] = M3[i,j,k] / (L*σiσjσk)
+                M3[i,j,k] = M3[i,j,k] / (σiσjσk)
 
             end
 
@@ -30,45 +32,63 @@ function coskewness(data)
 
     end
 
+	M3 = M3 ./ L
+
     return M3
     
 end
 
 function cokurtosis(data)
 
-	N = size(data)[2]
-	L = size(data)[1]
+    N = size(data)[2]
+    L = size(data)[1]
 
-	M4 = zeros((N, N, N, N))
+    M4 = zeros((N, N, N, N))
+    
+    cntr = data .- mean(data, dims=1)
 
-	@inbounds @simd for i in 1 : N
+    @inbounds @simd for i in 1 : N
 
-		for j in 1:N
+        for j in 1:N
 
-			for k in 1:N
-				
-				for l in 1:N
+            for k in 1:N
 
-				    for t in 1 : L
+                for l in 1:N
 
-				        M4[i,j,k,l] += (data[t,i] - mean(data[:,i])) * (data[t,j] - mean(data[:,j])) * (data[t,k] - mean(data[:,k])) * (data[t,l] - mean(data[:,l]))
+                    for t in 1 : L
 
-				    end
+                        M4[i,j,k,l] += cntr[t,i] * cntr[t,j] * cntr[t,k] * cntr[t,l]
 
-				    σiσjσkσl = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k]) * var(data[:, l]))
+                    end
 
-				    M4[i,j,k, l] = M4[i,j,k] / (L*σiσjσkσl)
-				    
-				end
+                    σiσjσkσl = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k]) * var(data[:, l]))
 
-			end
+                    M4[i,j,k,l] = M4[i,j,k,l] / (σiσjσkσl)
 
-		end
-	
-	end
+                end
+
+            end
+
+        end
+
+    end
+    
+    M4 = M4 ./ L
 
     return M4
     
+end
+
+function return_portfolio(portfolio, weights)
+
+	return dot(weights,  portfolio.μ)
+
+end
+
+function risk_portfolio(portfolio, weights)
+
+	return transpose(weights) * portfolio.Σ * weights
+
 end
 
 function skewness_portfolio(portfolio, weights)

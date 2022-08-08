@@ -65,8 +65,8 @@ function MV_fixed_return(portfolio::Portfolio, target_return; method="DCP", w_lo
 		f(w) = transpose(w)*portfolio.Σ*w
 	
 		## 0<w_i<1
-		lower = ones(6) .* w_lower
-		upper = ones(6) .* w_upper
+		lower = ones(length(portfolio.µ)) .* w_lower
+		upper = ones(length(portfolio.µ)) .* w_upper
 
 		## sum(w) = 1
 		c(w) = [sum(w), dot(w, portfolio.μ)]
@@ -133,8 +133,8 @@ function MV_fixed_risk(portfolio::Portfolio, target_risk; method="DCP", w_lower=
 		f(w) = -sum(w.*portfolio.μ)
 
 		## 0<w_i<1
-		lower = ones(6) .* w_lower
-		upper = ones(6) .* w_upper
+		lower = ones(length(portfolio.µ)) .* w_lower
+		upper = ones(length(portfolio.µ)) .* w_upper
 
 		## sum(w) = 1
 		c(w) = [sum(w), transpose(w)*portfolio.Σ*w]
@@ -173,9 +173,9 @@ function MV_fixed_risk(portfolio::Portfolio, target_risk; method="DCP", w_lower=
     
 end
 
-function MV_efficient_frontier(portfolio, points; method="DCP", w_lower=0.0, w_upper=1.0)
+function MV_efficient_frontier(portfolio, points; method="DCP", w_lower=0.0, w_upper=1.0, pop=500, sigma=1)
     
-    λs = range(0.0, stop=1, length=points)
+    λs = range(0.0, stop=1.0, length=points)
     
     MeanVar = zeros(points, 2)
 		
@@ -205,15 +205,15 @@ function MV_efficient_frontier(portfolio, points; method="DCP", w_lower=0.0, w_u
 	elseif method == "EO"
 	
 		## 0<w_i<1
-		lower = ones(6) .* w_lower
-		upper = ones(6) .* w_upper
+		lower = ones(length(portfolio.µ)) .* w_lower
+		upper = ones(length(portfolio.µ)) .* w_upper
 
 		## sum(w) = 1
 		c(w) = [sum(w)]
-		lc   = [1.0] # lower bound for constraint function
-		uc   = [1.0]   # upper bound for constraint function
+		lc   = [0.99] # lower bound for constraint function
+		uc   = [1.01]   # upper bound for constraint function
 
-		con = PenaltyConstraints(1e8, lower, upper, lc, uc, c)
+		con = PenaltyConstraints(1e6, lower, upper, lc, uc, c)
 
 		#Define initial condition
 		x0 = ones(length(portfolio.µ)) #./ length(portfolio.µ)
@@ -223,18 +223,19 @@ function MV_efficient_frontier(portfolio, points; method="DCP", w_lower=0.0, w_u
 			#Define objective function
 			f(w) = λs[i] * (transpose(w)*portfolio.Σ*w)  - (1-λs[i]) * dot(w, portfolio.μ)
 
-			
 			#Optimize using Genetic Algorithm
-			result = Evolutionary.optimize(f, con, x0, CMAES(μ=100, sigma0=0.01), 
-				            Evolutionary.Options(iterations=Int(1e6), abstol=1e-12, reltol=1e-6))
+			result = Evolutionary.optimize(f, con, x0, CMAES(μ=pop, sigma0=sigma), 
+				            Evolutionary.Options(iterations=Int(1e6), abstol=1e-10))
 
 			ret_opt = dot(result.minimizer, portfolio.μ)
 			risk_opt = sqrt(transpose(result.minimizer)*portfolio.Σ*result.minimizer)
-		
-			#Sanity Check
-			if sum(result.minimizer) < 0.99
+		            
+			ϵ = 0.001
 			
-				println("Optimization did not converge for λ=$(λs[i])...returning NaN.")
+			#Sanity Check
+			if (sum(result.minimizer) + ϵ < lc[1]) || (sum(result.minimizer) - ϵ > uc[1]) || result.converged == false
+			
+				println("Optimization failed for λ=$(λs[i])...returning NaN.")
 				
 				MeanVar[i, :] = [NaN, NaN]
 		    	weights[i, :] = ones(length(portfolio.assets)) .* NaN
@@ -251,6 +252,58 @@ function MV_efficient_frontier(portfolio, points; method="DCP", w_lower=0.0, w_u
 	end
     
     return MeanVar, weights
+    
+end
+
+function MVSK(portfolio, λs; w_lower=0.0, w_upper=1.0, pop=500, sigma=1)
+   
+    ## 0<w_i<1
+    lower = ones(length(portfolio.assets)) .* w_lower
+    upper = ones(length(portfolio.assets)) .* w_upper
+
+    ## sum(w) = 1
+    c(w) = [sum(w)]
+    lc   = [0.99] # lower bound for constraint function
+    uc   = [1.01]   # upper bound for constraint function
+
+    con = PenaltyConstraints(1e6, lower, upper, lc, uc, c)
+
+    #Define initial condition
+    x0 = ones(length(portfolio.µ)) #./ length(portfolio.µ)
+    
+    #Define objective function
+    f(w) = -λs[1] * dot(w, portfolio.μ) + λs[2] * (transpose(w)*portfolio.Σ*w) - λs[3] * skewness_portfolio(portfolio, w) + λs[4] * kurtosis_portfolio(portfolio, w)
+
+    #Optimize using Genetic Algorithm
+    result = Evolutionary.optimize(f, con, x0, CMAES(μ=pop, sigma0=sigma), 
+                    Evolutionary.Options(iterations=Int(1e6), abstol=1e-10))
+
+    ret_opt = dot(result.minimizer, portfolio.μ)
+    risk_opt = sqrt(transpose(result.minimizer)*portfolio.Σ*result.minimizer)
+    skew_opt = skewness_portfolio(portfolio, result.minimizer)
+    kurt_opt = kurtosis_portfolio(portfolio, result.minimizer)
+
+      ϵ = 0.001
+    
+    #Sanity Check
+    if (sum(result.minimizer) + ϵ < lc[1]) || (sum(result.minimizer) - ϵ > uc[1])
+
+        println("Optimization did not converge...returning NaN.")
+
+        ret_opt = NaN
+        risk_opt = NaN
+        skew_opt = NaN
+        kurt_opt = NaN
+
+        weights = ones(length(portfolio.assets)) .* NaN
+
+        return [ret_opt, risk_opt, skew_opt, kurt_opt], weights, result
+
+    else
+
+        return [ret_opt, risk_opt, skew_opt, kurt_opt], result.minimizer
+
+    end
     
 end
 
