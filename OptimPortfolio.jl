@@ -297,7 +297,7 @@ function MVSK(portfolio, λs; w_lower=0.0, w_upper=1.0, pop=500, sigma=1)
 
         weights = ones(length(portfolio.assets)) .* NaN
 
-        return [ret_opt, risk_opt, skew_opt, kurt_opt], weights, result
+        return [ret_opt, risk_opt, skew_opt, kurt_opt], weights
 
     else
 
