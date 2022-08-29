@@ -114,3 +114,36 @@ function kurtosis_portfolio(portfolio, weights)
     return cokurt_p
     
 end
+
+function maximum_drawdown(x)
+    
+    MDD = zeros(1, size(x)[2])
+    peak = ones(size(x)[2]) .* -99999
+    
+    DD = zeros(size(x))
+    
+    for j in 1 : size(x)[2]
+        
+        for i in 1 : size(x)[1]
+        
+            if (x[i, j] > peak[j])
+
+                peak[j] = x[i, j]
+
+            end
+
+            DD[i, j] = 100.0 * (peak[j] - x[i, j]) / peak[j]
+
+            if (DD[i, j] > MDD[1, j])
+
+                MDD[1, j] = DD[i, j]
+
+            end
+            
+        end
+
+    end
+        
+    return -DD, -MDD
+    
+end
