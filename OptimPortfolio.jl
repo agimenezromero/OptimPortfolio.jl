@@ -21,15 +21,25 @@ mutable struct Portfolio
         
 end
 
-function create_portfolio(data, assets)
+function create_portfolio(data, assets; higher_moments=true)
    
     μ = mean(data, dims=1)
     
     Σ = cov(data)
     
-    CSK = coskewness(data)
+    if higher_moments == true
     
-    CK = cokurtosis(data)
+    	CSK = coskewness(data)
+    
+    	CK = cokurtosis(data)
+    	
+    else
+    
+    	CSK = ones(1) .* NaN
+    	
+    	CK = ones(1) .* NaN
+    
+    end
     
     portfolio = Portfolio(assets, μ, Σ, CSK, CK)
     
@@ -269,9 +279,9 @@ function MV(portfolio, λ; method="DCP", w_lower=0.0, w_upper=1.0, pop=500, sigm
 		
 		risk = quadform(w, portfolio.Σ)
 		    
-	    p = minimize(λ*risk - (1-λ)*ret, sum(w) == 1,  w>=w_lower, w<=w_upper)
+	    	p = minimize(λ*risk - (1-λ)*ret, sum(w) == 1,  w>=w_lower, w<=w_upper)
 	    
-	    solve!(p, SCS.Optimizer; silent_solver=true)
+	    	solve!(p, SCS.Optimizer; silent_solver=true)
 		    
 		return evaluate(ret), sqrt(evaluate(risk)), evaluate(w)
 		
