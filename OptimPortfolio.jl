@@ -347,7 +347,7 @@ function MVSK(portfolio, λs; w_lower=0.0, w_upper=1.0, pop=500, sigma=1)
     x0 = ones(length(portfolio.µ)) ./ length(portfolio.µ)
     
     #Define objective function
-    f(w) = -λs[1] * dot(w, portfolio.μ) + λs[2] * (transpose(w)*portfolio.Σ*w) - λs[3] * skewness_portfolio(portfolio, w) + λs[4] * kurtosis_portfolio(portfolio, w)
+    f(w) = -λs[1] * dot(w, portfolio.μ) + λs[2] * (transpose(w)*portfolio.Σ*w) - λs[3] * standarized_skewness_portfolio(portfolio, w) + λs[4] * standarized_excess_kurtosis_portfolio(portfolio, w)
 
     #Optimize using Genetic Algorithm
     result = Evolutionary.optimize(f, con, x0, CMAES(μ=pop, sigma0=sigma), 
@@ -355,8 +355,8 @@ function MVSK(portfolio, λs; w_lower=0.0, w_upper=1.0, pop=500, sigma=1)
 
     ret_opt = dot(result.minimizer, portfolio.μ)
     risk_opt = sqrt(transpose(result.minimizer)*portfolio.Σ*result.minimizer)
-    skew_opt = skewness_portfolio(portfolio, result.minimizer)
-    kurt_opt = kurtosis_portfolio(portfolio, result.minimizer)
+    skew_opt = standarized_skewness_portfolio(portfolio, result.minimizer)
+    kurt_opt = standarized_excess_kurtosis_portfolio(portfolio, result.minimizer)
 
       ϵ = 0.001
     

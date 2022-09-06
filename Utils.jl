@@ -8,29 +8,23 @@ function coskewness(data)
 
     M3 = zeros((N, N, N))
     
-    cntr = data .- mean(data, dims=1)
+    avgs = mean(data, dims=1)
+    
+    cntr = data .- avgs
+    
+	@inbounds @simd for i in 1 : N
 
-    @inbounds @simd for i in 1 : N
+	    for j in 1:N
 
-        for j in 1:N
+	        for k in 1:N
 
-            for k in 1:N
+				M3[i, j, k] = sum(cntr[:, i] .* cntr[:, j] .* cntr[:, k])
 
-                for t in 1 : L
+	        end
 
-                    M3[i,j,k] += cntr[t,i] * cntr[t,j] * cntr[t,k]
+	    end
 
-                end
-
-                σiσjσk = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k]))
-
-                M3[i,j,k] = M3[i,j,k] / (σiσjσk)
-
-            end
-
-        end
-
-    end
+	end
 
 	M3 = M3 ./ L
 
@@ -45,34 +39,28 @@ function cokurtosis(data)
 
     M4 = zeros((N, N, N, N))
     
-    cntr = data .- mean(data, dims=1)
-
-    @inbounds @simd for i in 1 : N
-
-        for j in 1:N
-
-            for k in 1:N
-
-                for l in 1:N
-
-                    for t in 1 : L
-
-                        M4[i,j,k,l] += cntr[t,i] * cntr[t,j] * cntr[t,k] * cntr[t,l]
-
-                    end
-
-                    σiσjσkσl = sqrt(var(data[:, i])*var(data[:, j]) * var(data[:, k]) * var(data[:, l]))
-
-                    M4[i,j,k,l] = M4[i,j,k,l] / (σiσjσkσl)
-
-                end
-
-            end
-
-        end
-
-    end
+    avgs = mean(data, dims=1)
     
+    cntr = data .- avgs
+    	
+	@inbounds @simd for i in 1 : N
+
+	    for j in 1:N
+
+	        for k in 1:N
+
+	            for l in 1:N
+
+	                M4[i,j,k,l] += sum(cntr[:,i] .* cntr[:,j] .* cntr[:,k] .* cntr[:,l])
+
+	            end
+
+	        end
+
+	    end
+
+	end
+		
     M4 = M4 ./ L
 
     return M4
@@ -87,7 +75,7 @@ end
 
 function risk_portfolio(portfolio, weights)
 
-	return transpose(weights) * portfolio.Σ * weights
+	return sqrt(transpose(weights) * portfolio.Σ * weights)
 
 end
 
@@ -112,6 +100,44 @@ function kurtosis_portfolio(portfolio, weights)
     cokurt_p = transpose(weights) * M4 * kron(weights, weights, weights)
     
     return cokurt_p
+    
+end
+
+function standarized_skewness_portfolio(portfolio, weights)
+    
+    return skewness_portfolio(portfolio, weights) / risk_portfolio(portfolio, weights)^3
+    
+end
+
+function standarized_kurtosis_portfolio(portfolio, weights)
+    
+    return kurtosis_portfolio(portfolio, weights) / risk_portfolio(portfolio, weights)^4 
+    
+end
+
+function standarized_excess_kurtosis_portfolio(portfolio, weights)
+    
+    return kurtosis_portfolio(portfolio, weights) / risk_portfolio(portfolio, weights)^4 - 3
+    
+end
+
+function SharpeRatio(ret, risk)
+   
+    return @. ret / risk
+    
+end
+
+function mVaR(ret, risk, skew, kurt, α)
+   
+    Zα = quantile(Normal(0,1), α)
+    
+    return @. -ret + risk*(-Zα-(1/6)*(Zα^2-1)*skew - (1/24)*(Zα^3-3*Zα)*kurt + (1/36)*(2*Zα^3-5*Zα)*skew^2)
+    
+end
+
+function mSharpeRatio(ret, risk, skew, kurt, α)
+   
+    return @. ret / mVaR(ret, risk, skew, kurt, α)
     
 end
 
